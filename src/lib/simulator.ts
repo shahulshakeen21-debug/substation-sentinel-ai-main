@@ -166,3 +166,128 @@ export function makeAlert(r: SensorReading, p: Prediction): AlertItem | null {
     is_read: false,
   };
 }
+
+// ── In-browser SMS Simulator Fallbacks ───────────────────────────────────────
+const SMS_STORAGE_KEY = "dt_simulated_sms_config";
+const SMS_LOGS_KEY = "dt_simulated_sms_logs";
+
+export function getSimulatedSmsConfig() {
+  if (typeof window === "undefined") {
+    return {
+      enabled: true,
+      provider: "simulator" as const,
+      min_severity: "Warning" as const,
+      send_recovery: true,
+      cooldown_minutes: 15,
+      recipient_numbers: "+919876543210",
+      is_live_configured: false,
+      provider_name: "Safe Simulator (Client-side Demo)",
+    };
+  }
+  const saved = localStorage.getItem(SMS_STORAGE_KEY);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch {
+      // fallback
+    }
+  }
+  const defaultCfg = {
+    enabled: true,
+    provider: "simulator" as const,
+    min_severity: "Warning" as const,
+    send_recovery: true,
+    cooldown_minutes: 15,
+    recipient_numbers: "+919876543210",
+    is_live_configured: false,
+    provider_name: "Safe Simulator (Client-side Demo)",
+  };
+  localStorage.setItem(SMS_STORAGE_KEY, JSON.stringify(defaultCfg));
+  return defaultCfg;
+}
+
+export function saveSimulatedSmsConfig(patch: any) {
+  const current = getSimulatedSmsConfig();
+  const updated = { ...current, ...patch };
+  if (typeof window !== "undefined") {
+    localStorage.setItem(SMS_STORAGE_KEY, JSON.stringify(updated));
+  }
+  return updated;
+}
+
+export function getSimulatedSmsLogs() {
+  if (typeof window === "undefined") return [];
+  const saved = localStorage.getItem(SMS_LOGS_KEY);
+  if (saved) {
+    try {
+      return JSON.parse(saved);
+    } catch {
+      return [];
+    }
+  }
+  const initialLogs = [
+    {
+      id: 1,
+      timestamp: new Date(Date.now() - 3600000).toISOString(),
+      recipient: "+919876543210",
+      message: "[SUBSTATION ALERT] T1-400kV Warning: Winding temperature elevated (88°C). Inspection advised.",
+      severity: "Warning",
+      event_type: "EarlyWarning",
+      equipment_id: "T1-400kV",
+      parameter: "Winding Temperature",
+      delivery_status: "simulated",
+      provider: "simulator",
+      provider_sid: "SIM-INITIAL-001",
+    },
+  ];
+  localStorage.setItem(SMS_LOGS_KEY, JSON.stringify(initialLogs));
+  return initialLogs;
+}
+
+export function sendSimulatedTestSms(params: {
+  phone_number: string;
+  scenario?: "normal" | "warning" | "critical" | "recovery";
+  custom_message?: string;
+}) {
+  const scenario = params.scenario ?? "warning";
+  const scenarioText =
+    scenario === "critical"
+      ? "CRITICAL ALERT: T1-400kV oil temperature exceeded 95°C. Immediate breaker trip inspection initiated!"
+      : scenario === "warning"
+      ? "WARNING: T1-400kV current load spike 980A detected. Cooldown protocol running."
+      : scenario === "recovery"
+      ? "RECOVERY: T1-400kV parameters stabilized within nominal limits."
+      : "TEST: Telemetry link verified operational for Substation Bay T1.";
+
+  const formatted = params.custom_message || `[SUBSTATION ${scenario.toUpperCase()}] ${scenarioText}`;
+
+  const newLog = {
+    id: Date.now(),
+    timestamp: new Date().toISOString(),
+    recipient: params.phone_number,
+    message: formatted,
+    severity: scenario === "critical" ? "Critical" : scenario === "warning" ? "Warning" : "Healthy",
+    event_type: scenario === "critical" ? "ActiveFault" : "TestAlert",
+    equipment_id: "T1-400kV",
+    parameter: "Telemetry Check",
+    delivery_status: "simulated" as const,
+    provider: "simulator",
+    provider_sid: `SIM-${Math.random().toString(36).substring(2, 9).toUpperCase()}`,
+  };
+
+  if (typeof window !== "undefined") {
+    const logs = getSimulatedSmsLogs();
+    logs.unshift(newLog);
+    localStorage.setItem(SMS_LOGS_KEY, JSON.stringify(logs.slice(0, 50)));
+  }
+
+  return {
+    ok: true,
+    delivery_status: "simulated",
+    provider: "Simulator (Demo)",
+    recipient: params.phone_number,
+    formatted_message: formatted,
+    log_id: newLog.id,
+  };
+}
+

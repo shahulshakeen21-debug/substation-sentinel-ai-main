@@ -3,7 +3,15 @@
 // always works. Point VITE_API_URL at http://localhost:8000 when you run
 // the FastAPI project under /backend.
 
-import { generateReading, predict, type FaultMode } from "./simulator";
+import {
+  generateReading,
+  predict,
+  type FaultMode,
+  getSimulatedSmsConfig,
+  saveSimulatedSmsConfig,
+  getSimulatedSmsLogs,
+  sendSimulatedTestSms,
+} from "./simulator";
 import type {
   AlertItem,
   EquipmentHealthSummary,
@@ -13,6 +21,8 @@ import type {
   SensorReading,
   ThresholdConfig,
   WsNotification,
+  SmsConfig,
+  SmsLogItem,
 } from "./types";
 
 const BASE =
@@ -170,14 +180,16 @@ export function openNotificationSocket(
 // ── SMS Alert Gateway API ────────────────────────────────────────────────────
 
 export async function fetchSmsConfig(): Promise<SmsConfig | null> {
-  return tryFetch<SmsConfig>("/sms/config");
+  const remote = await tryFetch<SmsConfig>("/sms/config");
+  return remote ?? getSimulatedSmsConfig();
 }
 
 export async function updateSmsConfig(patch: Partial<SmsConfig>): Promise<SmsConfig | null> {
-  return tryFetch<SmsConfig>("/sms/config", {
+  const remote = await tryFetch<SmsConfig>("/sms/config", {
     method: "PATCH",
     body: JSON.stringify(patch),
   });
+  return remote ?? saveSimulatedSmsConfig(patch);
 }
 
 export async function sendTestSms(params: {
@@ -193,15 +205,24 @@ export async function sendTestSms(params: {
   error?: string;
   log_id?: number;
 } | null> {
-  return tryFetch("/sms/test", {
+  const remote = await tryFetch<{
+    ok: boolean;
+    delivery_status: string;
+    provider: string;
+    recipient: string;
+    formatted_message?: string;
+    error?: string;
+    log_id?: number;
+  }>("/sms/test", {
     method: "POST",
     body: JSON.stringify(params),
   });
+  return remote ?? sendSimulatedTestSms(params);
 }
 
 export async function fetchSmsLogs(limit: number = 30): Promise<SmsLogItem[]> {
   const remote = await tryFetch<SmsLogItem[]>(`/sms/logs?limit=${limit}`);
-  return remote ?? [];
+  return remote ?? getSimulatedSmsLogs().slice(0, limit);
 }
 
 export const backendConnected = () => Boolean(BASE);
