@@ -146,3 +146,25 @@ export interface SmsLogItem {
   error_message?: string;
 }
 
+// AI Transformer Assistant Chat
+export interface AssistantChatResponse {
+  reply: string;
+  affected_component_id?: string | null;
+  affected_component_label?: string | null;
+  provider: string;
+  is_simulated_data: boolean;
+  suggested_questions: string[];
+}
+
+export interface AssistantChatMessage {
+  id: string;
+  sender: "user" | "assistant";
+  text: string;
+  timestamp: string;
+  affected_component_id?: string | null;
+  affected_component_label?: string | null;
+  provider?: string;
+  suggested_questions?: string[];
+  isError?: boolean;
+}
+

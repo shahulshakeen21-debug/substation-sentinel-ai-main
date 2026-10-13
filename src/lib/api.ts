@@ -225,5 +225,155 @@ export async function fetchSmsLogs(limit: number = 30): Promise<SmsLogItem[]> {
   return remote ?? getSimulatedSmsLogs().slice(0, limit);
 }
 
+// ── AI Transformer Assistant ─────────────────────────────────────────────────
+
+export async function sendAssistantChat(params: {
+  query: string;
+  reading?: SensorReading | null;
+  prediction?: Prediction | null;
+  alerts?: AlertItem[];
+}): Promise<AssistantChatResponse> {
+  const remote = await tryFetch<AssistantChatResponse>("/assistant/chat", {
+    method: "POST",
+    body: JSON.stringify({
+      query: params.query,
+      client_telemetry: params.reading,
+    }),
+  });
+
+  if (remote) return remote;
+
+  // Local expert engine fallback (when FastAPI backend is not connected or in Vercel preview)
+  return generateClientAssistantReply(params.query, params.reading, params.prediction, params.alerts);
+}
+
+function generateClientAssistantReply(
+  query: string,
+  reading?: SensorReading | null,
+  prediction?: Prediction | null,
+  alerts: AlertItem[] = [],
+): AssistantChatResponse {
+  const q = query.toLowerCase();
+  const r = reading;
+  const p = prediction;
+
+  const wt = r?.winding_temperature ?? r?.temperature ?? 65.0;
+  const ot = r?.oil_temperature ?? 50.0;
+  const v = r?.voltage ?? 400.0;
+  const curr = r?.current ?? 550.0;
+  const ol = r?.oil_level ?? 78.0;
+  const press = r?.pressure ?? 0.5;
+  const leak = r?.oil_leakage ?? 0;
+  const fan = r?.cooling_fan_status ?? 1;
+  const pump = r?.cooling_pump_status ?? 1;
+  const status = p?.status ?? (alerts.some((a) => a.severity === "Critical") ? "Critical" : alerts.some((a) => a.severity === "Warning") ? "Warning" : "Healthy");
+  const prob = p?.failure_probability ?? 0.05;
+
+  let reply = "";
+  let compId: string | null = null;
+  let compLabel: string | null = null;
+
+  if (q.includes("why") || q.includes("reason") || q.includes("warning") || q.includes("critical") || q.includes("status")) {
+    if (alerts.length > 0) {
+      const top = alerts[0];
+      const param = top.parameter.toLowerCase();
+      if (param.includes("temp") || param.includes("winding") || param.includes("overheat")) {
+        compId = "main_tank";
+        compLabel = "Main Transformer Tank & Winding Core";
+      } else if (param.includes("oil level") || param.includes("conservator")) {
+        compId = "conservator_tank";
+        compLabel = "Conservator Oil Reservoir & Breather";
+      } else if (param.includes("leak") || param.includes("seep")) {
+        compId = "oil_piping";
+        compLabel = "Oil Header Piping & Flanged Seals";
+      } else if (param.includes("voltage") || param.includes("bushing")) {
+        compId = "hv_bushings";
+        compLabel = "400 kV High Voltage Bushings";
+      } else if (param.includes("cooling") || param.includes("fan")) {
+        compId = "cooling_fans";
+        compLabel = "Forced Cooling Fan Assemblies";
+      } else {
+        compId = "main_tank";
+        compLabel = "Main Transformer Tank";
+      }
+
+      reply = `**Equipment Status: ${status.toUpperCase()}**\n\nThe transformer entered **${status}** status due to active alert: \`${top.message}\`.\n\n**Telemetry Context:**\n- Winding Hot-Spot: **${wt.toFixed(1)} °C** (Limit: 95°C / 115°C)\n- Top Oil Temp: **${ot.toFixed(1)} °C**\n- Conservator Oil Level: **${ol.toFixed(1)} %** (Nominal: > 55%)\n- Voltage: **${v.toFixed(1)} kV** | Load Current: **${curr.toFixed(1)} A**\n\n**ML Prognostic Risk:** Random Forest classifier estimates **${(prob * 100).toFixed(1)}% failure probability**. This is an early predictive trend warning, not a confirmed mechanical breakdown.\n\n*Safety Requirement: Live physical checks must be performed by qualified substation personnel under LOTO procedures.*`;
+    } else {
+      compId = "main_tank";
+      compLabel = "Main Transformer Tank";
+      reply = `**Equipment Status: HEALTHY**\n\nAll telemetry parameters for Transformer Bay T1-400kV are operating within safe IEEE C57 bounds. Winding temperature is **${wt.toFixed(1)} °C**, oil level is nominal at **${ol.toFixed(1)} %**, and bus voltage is stable at **${v.toFixed(1)} kV**. ML model evaluates failure risk at **${(prob * 100).toFixed(1)}%**.`;
+    }
+  } else if (q.includes("temperature") || q.includes("thermal") || q.includes("heat")) {
+    compId = "main_tank";
+    compLabel = "Main Transformer Tank & Winding Core";
+    reply = `**Thermal System Telemetry:**\n\n- **Winding Hot-Spot Temperature:** **${wt.toFixed(1)} °C** (Warning: 95 °C, Trip: 115 °C)\n- **Top Oil Temperature:** **${ot.toFixed(1)} °C** (Warning: 85 °C, Trip: 100 °C)\n- **Cooling Equipment:** Fans: **${fan === 1 ? "Operational" : "TRIPPED"}** | Pumps: **${pump === 1 ? "Operational" : "TRIPPED"}**\n\n${wt >= 95 ? "⚠️ Winding hot-spot thermal stress is elevated! Sustained temperature above 98°C accelerates cellulose insulation ageing." : "Temperatures are within nominal continuous rated limits."}`;
+  } else if (q.includes("oil") || q.includes("leak") || q.includes("level")) {
+    compId = ol < 55 ? "conservator_tank" : "oil_piping";
+    compLabel = ol < 55 ? "Conservator Oil Reservoir & Breather" : "Oil Header Piping & Flanged Seals";
+    const leakStr = ["None detected", "Suspected seepage", "Confirmed leakage indicated"][leak] ?? "None";
+    reply = `**Oil Preservation System Telemetry:**\n\n- **Conservator Oil Level (MOG):** **${ol.toFixed(1)} %** (Alarm: < 55 %, Trip: < 45 %)\n- **Oil Leakage Sensor:** **${leakStr}**\n- **Hydraulic Pressure:** **${press.toFixed(2)} bar**\n\n${ol < 55 || leak > 0 ? "⚠️ Warning: Low oil level or active seepage. Verify conservator sight-glass and examine radiator gasket joints." : "Oil level and pressure are stable in the conservator reservoir."}`;
+  } else if (q.includes("voltage") || q.includes("current") || q.includes("load")) {
+    compId = "hv_bushings";
+    compLabel = "400 kV High Voltage Bushings";
+    reply = `**Electrical Telemetry Summary:**\n\n- **Primary Bus Voltage:** **${v.toFixed(1)} kV** (Nominal: 400 kV | Overvoltage Limit: 410 kV)\n- **Phase Load Current:** **${curr.toFixed(1)} A** (Overload Limit: 950 A)\n\n${v > 410 || curr > 950 ? "⚠️ Voltage or current exceeds normal rated bandwidth. Review automatic tap changer (OLTC) stepping." : "Electrical power flow is balanced and within steady-state limits."}`;
+  } else if (q.includes("component") || q.includes("affected") || q.includes("which")) {
+    if (alerts.length > 0) {
+      const top = alerts[0];
+      const param = top.parameter.toLowerCase();
+      if (param.includes("temp") || param.includes("winding") || param.includes("overheat")) {
+        compId = "main_tank";
+        compLabel = "Main Transformer Tank & Winding Core";
+      } else if (param.includes("oil level") || param.includes("conservator")) {
+        compId = "conservator_tank";
+        compLabel = "Conservator Oil Reservoir & Breather";
+      } else if (param.includes("leak") || param.includes("seep")) {
+        compId = "oil_piping";
+        compLabel = "Oil Header Piping & Flanged Seals";
+      } else if (param.includes("voltage") || param.includes("bushing")) {
+        compId = "hv_bushings";
+        compLabel = "400 kV High Voltage Bushings";
+      } else if (param.includes("fan") || param.includes("cooling")) {
+        compId = "cooling_fans";
+        compLabel = "Forced Cooling Fan Assemblies";
+      } else {
+        compId = "main_tank";
+        compLabel = "Main Transformer Tank";
+      }
+      reply = `**Identified Affected Component:** \`${compLabel}\`\n\nThe primary active condition (\`${top.message}\`) maps directly to \`${compLabel}\` on the 3D model. Click **'View Affected Component'** below to focus the digital twin camera on this location.`;
+    } else {
+      compId = "main_tank";
+      compLabel = "Main Transformer Tank";
+      reply = "No active faults detected. All 3D digital twin components (Main Tank, Conservator, Bushings, Radiators) are currently in nominal healthy status.";
+    }
+  } else if (q.includes("maintenance") || q.includes("check") || q.includes("inspect") || q.includes("action")) {
+    compId = fan === 0 || pump === 0 ? "cooling_fans" : "main_tank";
+    compLabel = fan === 0 || pump === 0 ? "Forced Cooling Fan Assemblies" : "Main Transformer Tank";
+    reply = `**Recommended Maintenance Protocol:**\n\n1. **Visual & Acoustic Check:** Inspect main tank seams, radiators, and bushings for acoustic vibration chattering or weeping oil.\n2. **Infrared Thermography:** Perform thermal scan of 400kV bushing connectors and cooling radiator fins.\n3. **Oil DGA Testing:** Draw bottom-sample mineral oil for dissolved gas chromatography (IEC 60599).\n4. **Auxiliary Circuit Test:** Verify cooling fan motor overload relays and silica-gel breather color.\n\n*Always confirm circuit de-energization and safety grounding before accessing the HV yard.*`;
+  } else if (q.includes("ml") || q.includes("predict") || q.includes("model")) {
+    compId = "main_tank";
+    compLabel = "Main Transformer Tank";
+    reply = `**Machine Learning Diagnostics:**\n\n- **Model Type:** Multi-Variate Random Forest Classifier\n- **Failure Risk Probability:** **${(prob * 100).toFixed(1)} %**\n- **Diagnostic Assessment:** ${p?.recommendation ?? "Nominal operational status."}\n\n*Note: This probability is an ML-derived anomaly index calculated from live telemetry vectors. It serves as an early decision-support aid.*`;
+  } else {
+    reply = `**Substation Sentinel AI Diagnostic Assistant**\n\nLive overview for **T1-400kV Substation Bay (315 MVA)**:\n- Current Status: **${status}**\n- ML Failure Probability: **${(prob * 100).toFixed(1)} %**\n- Winding Temp: **${wt.toFixed(1)} °C** | Oil Level: **${ol.toFixed(1)} %**\n- Primary Bus Voltage: **${v.toFixed(1)} kV** | Current: **${curr.toFixed(1)} A**\n\nHow can I help you inspect telemetry, diagnose warnings, or locate affected 3D components?`;
+  }
+
+  return {
+    reply,
+    affected_component_id: compId,
+    affected_component_label: compLabel,
+    provider: "Substation Sentinel Expert AI Engine",
+    is_simulated_data: true,
+    suggested_questions: [
+      "Why is my transformer showing a warning?",
+      "What are the latest temperature and voltage readings?",
+      "Is the oil level decreasing?",
+      "Which component is associated with the latest alert?",
+      "What maintenance checks are recommended?",
+      "Explain the latest ML prediction.",
+      "Show the component associated with the current fault.",
+    ],
+  };
+}
+
 export const backendConnected = () => Boolean(BASE);
 

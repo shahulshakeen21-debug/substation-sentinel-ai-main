@@ -18,6 +18,9 @@ import { AlertPanel } from "@/components/AlertPanel";
 import { RecommendationPanel } from "@/components/RecommendationPanel";
 import { LiveChart } from "@/components/LiveChart";
 import { SensorTable } from "@/components/SensorTable";
+import { Transformer3DViewer, type Transformer3DViewerRef } from "@/components/Transformer3D/Transformer3DViewer";
+import { AssistantWidget } from "@/components/Assistant/AssistantWidget";
+import { HistoricalTrends } from "@/components/HistoricalTrends";
 import { fetchLatestReading, fetchPrediction } from "@/lib/api";
 import { makeAlert } from "@/lib/simulator";
 import type { FaultMode } from "@/lib/simulator";
@@ -51,6 +54,7 @@ function Dashboard() {
   const [prediction, setPrediction] = useState<Prediction | null>(null);
   const [alerts, setAlerts] = useState<AlertItem[]>([]);
   const running = useRef(true);
+  const transformerViewerRef = useRef<Transformer3DViewerRef>(null);
 
   // Redirect to /login if the "session" is missing.
   useEffect(() => {
@@ -247,6 +251,15 @@ function Dashboard() {
           </div>
         )}
 
+        {/* 3D Transformer Digital Twin Interactive Visualization */}
+        <Transformer3DViewer
+          ref={transformerViewerRef}
+          reading={latest}
+          prediction={prediction}
+          alerts={alerts}
+          isSimulated={true}
+        />
+
         {/* Main grid */}
         <div className="grid gap-4 lg:grid-cols-3">
           <div className="lg:col-span-2 space-y-4">
@@ -278,6 +291,9 @@ function Dashboard() {
                 { key: "oil_condition", color: "var(--color-healthy)", label: "Oil Condition/100" },
               ]}
             />
+
+            {/* Historical Sensor Trends Multi-Parameter Analytics */}
+            <HistoricalTrends history={history} />
           </div>
 
           <div className="space-y-4">
@@ -286,6 +302,16 @@ function Dashboard() {
             <AlertPanel alerts={alerts} />
           </div>
         </div>
+
+        {/* AI Transformer Diagnostic Assistant Floating Panel */}
+        <AssistantWidget
+          reading={latest}
+          prediction={prediction}
+          alerts={alerts}
+          onFocusComponent={(cid) => {
+            transformerViewerRef.current?.focusComponent(cid);
+          }}
+        />
       </main>
     </div>
   );

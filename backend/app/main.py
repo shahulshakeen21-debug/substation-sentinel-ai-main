@@ -15,7 +15,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .database import Base, SessionLocal, engine
-from .routers import alerts, auth, predictions, reports, sensors
+from .routers import alerts, assistant, auth, predictions, reports, sensors
 from .routers import maintenance, sms_router
 from .seed import seed_default_user
 
@@ -54,6 +54,7 @@ app.include_router(alerts.router)
 app.include_router(reports.router)
 app.include_router(maintenance.router)
 app.include_router(sms_router.router)
+app.include_router(assistant.router)
 
 
 
