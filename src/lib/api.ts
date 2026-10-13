@@ -23,6 +23,7 @@ import type {
   WsNotification,
   SmsConfig,
   SmsLogItem,
+  AssistantChatResponse,
 } from "./types";
 
 const BASE =

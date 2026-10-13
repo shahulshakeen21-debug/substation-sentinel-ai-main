@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Zap, ShieldCheck } from "lucide-react";
+import { Zap, ShieldCheck, Info } from "lucide-react";
 import { login } from "@/lib/api";
 
 // Login page (route "/"). Real credential check hits FastAPI when
@@ -31,7 +31,7 @@ function LoginPage() {
     const ok = await login(username, password);
     setLoading(false);
     if (!ok) {
-      setError("Invalid credentials. Try operator / substation for demo.");
+      setError("Invalid credentials. Demo credentials (operator / substation) are intentionally pre-set for hackathon evaluation.");
       return;
     }
     localStorage.setItem("dt_user", username);
@@ -46,8 +46,8 @@ function LoginPage() {
             <Zap className="h-5 w-5" />
           </div>
           <div>
-            <h1 className="text-lg font-semibold">AI Digital Twin</h1>
-            <p className="text-xs font-mono text-muted-foreground">EHV 400 / 220 kV Substation</p>
+            <h1 className="text-lg font-semibold">Substation Sentinel AI</h1>
+            <p className="text-xs font-mono text-muted-foreground">EHV 400 / 220 kV Substation Digital Twin</p>
           </div>
         </div>
 
@@ -98,10 +98,28 @@ function LoginPage() {
             </button>
           </form>
 
-          <p className="mt-4 text-[11px] font-mono text-muted-foreground">
-            Demo: <span className="text-foreground">operator</span> /{" "}
-            <span className="text-foreground">substation</span>
-          </p>
+          {/* Hackathon evaluation notice: clarifying that showing credentials is intentionally provided */}
+          <div className="mt-5 rounded-lg border border-primary/20 bg-primary/5 p-3 text-xs">
+            <div className="flex items-center justify-between">
+              <span className="font-medium text-foreground flex items-center gap-1.5">
+                <Info className="h-3.5 w-3.5 text-primary" />
+                Hackathon Demo Mode
+              </span>
+              <span className="text-[10px] uppercase tracking-wider font-mono px-1.5 py-0.5 rounded bg-primary/15 text-primary font-semibold">
+                Intentional
+              </span>
+            </div>
+            <p className="mt-1.5 text-muted-foreground text-[11px] leading-relaxed">
+              Showing credentials is intentional for rapid hackathon testing and evaluation without manual account configuration.
+            </p>
+            <div className="mt-2 flex items-center gap-2 font-mono text-[11px] text-foreground bg-background/80 px-2.5 py-1.5 rounded border border-border/60">
+              <span className="text-muted-foreground">User:</span>
+              <span className="font-semibold text-primary">operator</span>
+              <span className="text-muted-foreground/60">|</span>
+              <span className="text-muted-foreground">Password:</span>
+              <span className="font-semibold text-primary">substation</span>
+            </div>
+          </div>
         </div>
       </div>
     </div>

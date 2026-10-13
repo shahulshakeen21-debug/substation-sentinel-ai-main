@@ -34,7 +34,7 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
@@ -77,13 +77,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Lovable App" },
+      { title: "Substation Sentinel AI" },
       {
         name: "description",
         content:
           "AI/ML Digital Twin for EHV substations monitors equipment health and predicts failures.",
       },
-      { property: "og:title", content: "Lovable App" },
+      { property: "og:title", content: "Substation Sentinel AI" },
       {
         property: "og:description",
         content:
@@ -91,10 +91,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Lovable App" },
+      { name: "twitter:title", content: "Substation Sentinel AI" },
       { name: "twitter:description", content: "AI/ML Digital Twin for EHV substations monitors equipment health and predicts failures." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/92af9459-5e5c-4593-9cc7-398d0ef5a2e9/id-preview-4ff59fa4--b4a5ed62-a465-4681-87d6-e3a451ae6792.lovable.app-1783858842437.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/92af9459-5e5c-4593-9cc7-398d0ef5a2e9/id-preview-4ff59fa4--b4a5ed62-a465-4681-87d6-e3a451ae6792.lovable.app-1783858842437.png" },
+      { property: "og:image", content: "/preview.png" },
+      { name: "twitter:image", content: "/preview.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
