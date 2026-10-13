@@ -65,23 +65,49 @@ export function createTransformerScene(
   rimLight.position.set(0, -5, 0);
   scene.add(rimLight);
 
-  // Ground Substation Pad
+  // Ground Substation Pad & Holographic Pedestal (Matching Image 2)
   const groundGroup = new THREE.Group();
-  const plinthGeo = new THREE.BoxGeometry(10, 0.3, 8);
-  const plinthMat = new THREE.MeshStandardMaterial({
-    color: 0x1e293b,
-    roughness: 0.9,
-    metalness: 0.1,
-  });
-  const plinth = new THREE.Mesh(plinthGeo, plinthMat);
-  plinth.position.y = -0.15;
-  plinth.receiveShadow = true;
-  groundGroup.add(plinth);
 
-  // Rails for transformer wheels
-  const railMat = new THREE.MeshStandardMaterial({ color: 0x64748b, roughness: 0.5, metalness: 0.8 });
+  // Circular metallic pedestal
+  const pedestalGeo = new THREE.CylinderGeometry(4.3, 4.5, 0.22, 64);
+  const pedestalMat = new THREE.MeshStandardMaterial({
+    color: 0x0f172a,
+    roughness: 0.35,
+    metalness: 0.8,
+  });
+  const pedestal = new THREE.Mesh(pedestalGeo, pedestalMat);
+  pedestal.position.y = -0.11;
+  pedestal.receiveShadow = true;
+  groundGroup.add(pedestal);
+
+  // Concentric glowing cyan & emerald telemetry rings on pedestal
+  const outerRingGeo = new THREE.RingGeometry(3.95, 4.08, 64);
+  const cyanRingMat = new THREE.MeshBasicMaterial({ color: 0x06b6d4, side: THREE.DoubleSide });
+  const outerRing = new THREE.Mesh(outerRingGeo, cyanRingMat);
+  outerRing.rotation.x = Math.PI / 2;
+  outerRing.position.y = 0.01;
+  groundGroup.add(outerRing);
+
+  const innerRingGeo = new THREE.RingGeometry(3.1, 3.16, 64);
+  const emeraldRingMat = new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide });
+  const innerRing = new THREE.Mesh(innerRingGeo, emeraldRingMat);
+  innerRing.rotation.x = Math.PI / 2;
+  innerRing.position.y = 0.01;
+  groundGroup.add(innerRing);
+
+  // Radial telemetry markers
+  for (let a = 0; a < Math.PI * 2; a += Math.PI / 8) {
+    const tickGeo = new THREE.BoxGeometry(0.04, 0.01, 0.35);
+    const tick = new THREE.Mesh(tickGeo, cyanRingMat);
+    tick.position.set(Math.cos(a) * 3.55, 0.01, Math.sin(a) * 3.55);
+    tick.rotation.y = -a;
+    groundGroup.add(tick);
+  }
+
+  // Steel mounting rails
+  const railMat = new THREE.MeshStandardMaterial({ color: 0x475569, roughness: 0.4, metalness: 0.85 });
   for (const z of [-1.1, 1.1]) {
-    const railGeo = new THREE.BoxGeometry(6.5, 0.08, 0.12);
+    const railGeo = new THREE.BoxGeometry(5.8, 0.08, 0.14);
     const rail = new THREE.Mesh(railGeo, railMat);
     rail.position.set(0, 0.04, z);
     rail.castShadow = true;
@@ -119,9 +145,9 @@ export function createTransformerScene(
     return mat;
   };
 
-  // 1. MAIN TANK
+  // 1. MAIN TANK (Dark industrial metallic finish matching Image 2)
   const mainTankGroup = createComponentGroup("main_tank");
-  const tankMat = createStdMat("main_tank", 0x334155, 0.45, 0.55); // Industrial transformer grey-slate
+  const tankMat = createStdMat("main_tank", 0x1e293b, 0.35, 0.7); // Rich dark industrial gunmetal slate
   const tankGeo = new THREE.BoxGeometry(3.6, 2.2, 2.0);
   const mainTankBody = new THREE.Mesh(tankGeo, tankMat);
   mainTankBody.position.set(0, 1.25, 0);
@@ -130,17 +156,40 @@ export function createTransformerScene(
   mainTankBody.userData = { componentId: "main_tank" };
   mainTankGroup.add(mainTankBody);
 
-  // Stiffeners on Main Tank
-  for (let x = -1.5; x <= 1.5; x += 0.75) {
-    const ribGeo = new THREE.BoxGeometry(0.08, 2.0, 0.1);
+  // Corrugated vertical cooling ribs on tank walls (Front & Back)
+  for (let x = -1.6; x <= 1.6; x += 0.32) {
+    const ribGeo = new THREE.BoxGeometry(0.04, 1.9, 0.08);
     const rib1 = new THREE.Mesh(ribGeo, tankMat);
-    rib1.position.set(x, 1.25, 1.05);
+    rib1.position.set(x, 1.25, 1.04);
     rib1.userData = { componentId: "main_tank" };
     mainTankGroup.add(rib1);
     const rib2 = new THREE.Mesh(ribGeo, tankMat);
-    rib2.position.set(x, 1.25, -1.05);
+    rib2.position.set(x, 1.25, -1.04);
     rib2.userData = { componentId: "main_tank" };
     mainTankGroup.add(rib2);
+  }
+
+  // Neon telemetry circuit traces (Matching Image 2 holographic overlay)
+  const circuitMatCyan = new THREE.MeshBasicMaterial({ color: 0x06b6d4 });
+  const circuitMatEmerald = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+
+  // Horizontal diagnostic bus lines on the front face
+  const trace1Geo = new THREE.BoxGeometry(2.8, 0.02, 0.02);
+  const trace1 = new THREE.Mesh(trace1Geo, circuitMatCyan);
+  trace1.position.set(0, 1.6, 1.06);
+  mainTankGroup.add(trace1);
+
+  const trace2Geo = new THREE.BoxGeometry(2.4, 0.02, 0.02);
+  const trace2 = new THREE.Mesh(trace2Geo, circuitMatEmerald);
+  trace2.position.set(0.2, 0.8, 1.06);
+  mainTankGroup.add(trace2);
+
+  // Vertical data conduit runs
+  for (const x of [-0.9, 0.6]) {
+    const vTraceGeo = new THREE.BoxGeometry(0.02, 0.8, 0.02);
+    const vTrace = new THREE.Mesh(vTraceGeo, circuitMatCyan);
+    vTrace.position.set(x, 1.2, 1.06);
+    mainTankGroup.add(vTrace);
   }
 
   // Cover flange
@@ -510,20 +559,25 @@ export function createTransformerScene(
 
       mats.forEach((mat) => {
         if (isSelected) {
-          // Highlight selected component with cyan halo
-          mat.emissive.setHex(0x06b6d4); // Vibrant cyan
-          mat.emissiveIntensity = 0.5 + 0.3 * pulseFactor;
+          // Highlight selected component with refined rim glow that preserves metallic textures
+          if (compId === "main_tank") {
+            mat.emissive.setHex(0x0ea5e9);
+            mat.emissiveIntensity = 0.12 + 0.08 * pulseFactor;
+          } else {
+            mat.emissive.setHex(0x06b6d4);
+            mat.emissiveIntensity = 0.28 + 0.15 * pulseFactor;
+          }
         } else if (state === "Critical") {
           // Red warning pulse
           mat.emissive.setHex(0xef4444);
-          mat.emissiveIntensity = 0.35 + 0.5 * pulseFactor;
+          mat.emissiveIntensity = 0.35 + 0.4 * pulseFactor;
         } else if (state === "Warning") {
           // Amber glow
           mat.emissive.setHex(0xf59e0b);
-          mat.emissiveIntensity = 0.25 + 0.35 * pulseFactor;
+          mat.emissiveIntensity = 0.22 + 0.25 * pulseFactor;
         } else if (state === "Unknown") {
           mat.emissive.setHex(0x64748b);
-          mat.emissiveIntensity = 0.1;
+          mat.emissiveIntensity = 0.08;
         } else {
           // Healthy: neutral appearance
           mat.emissive.setHex(0x000000);

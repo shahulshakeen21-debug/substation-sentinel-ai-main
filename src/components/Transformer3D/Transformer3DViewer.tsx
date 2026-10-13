@@ -53,10 +53,11 @@ export const Transformer3DViewer = React.forwardRef<Transformer3DViewerRef, Tran
     const sceneHandleRef = useRef<TransformerSceneHandle | null>(null);
     const controlsRef = useRef<OrbitControls | null>(null);
 
-    const [selectedComponentId, setSelectedComponentId] = useState<TransformerComponentId | null>("main_tank");
+    const [selectedComponentId, setSelectedComponentId] = useState<TransformerComponentId | null>(null);
     const [hoveredComponentId, setHoveredComponentId] = useState<TransformerComponentId | null>(null);
     const [isExpanded, setIsExpanded] = useState<boolean>(false);
     const [activePreset, setActivePreset] = useState<string>("overview");
+    const [viewMode, setViewMode] = useState<"3d" | "scada">("3d");
 
     // Compute diagnostics
     const diagnostics = useMemo(() => {
@@ -252,36 +253,70 @@ export const Transformer3DViewer = React.forwardRef<Transformer3DViewerRef, Tran
           </div>
 
           <div className="flex items-center flex-wrap gap-2">
-            {/* Viewpoint presets */}
-            <div className="hidden md:flex items-center gap-1 bg-background/50 border border-border rounded-lg p-1 text-xs">
-              <Camera className="h-3.5 w-3.5 text-muted-foreground ml-1 mr-0.5" />
-              {CAMERA_PRESETS.map((preset) => (
-                <button
-                  key={preset.id}
-                  onClick={() => {
-                    setActivePreset(preset.id);
-                    moveCamera(preset.position, preset.target);
-                  }}
-                  className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
-                    activePreset === preset.id
-                      ? "bg-primary text-primary-foreground font-semibold"
-                      : "text-muted-foreground hover:text-foreground hover:bg-accent"
-                  }`}
-                >
-                  {preset.label}
-                </button>
-              ))}
+            {/* View Mode Toggle: 3D Twin vs SCADA Graphic Image */}
+            <div className="flex items-center rounded-lg border border-border bg-background/60 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setViewMode("3d")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode === "3d"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+                title="Interactive 3D Three.js Digital Twin"
+              >
+                <Cpu className="h-3.5 w-3.5" />
+                <span>3D Model</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setViewMode("scada")}
+                className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
+                  viewMode === "scada"
+                    ? "bg-primary text-primary-foreground font-semibold shadow-sm"
+                    : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                }`}
+                title="Photorealistic SCADA Digital Twin Image"
+              >
+                <Sparkles className="h-3.5 w-3.5" />
+                <span>SCADA Twin Image</span>
+              </button>
             </div>
 
+            {/* Viewpoint presets (shown in 3D mode) */}
+            {viewMode === "3d" && (
+              <div className="hidden md:flex items-center gap-1 bg-background/50 border border-border rounded-lg p-1 text-xs">
+                <Camera className="h-3.5 w-3.5 text-muted-foreground ml-1 mr-0.5" />
+                {CAMERA_PRESETS.map((preset) => (
+                  <button
+                    key={preset.id}
+                    onClick={() => {
+                      setActivePreset(preset.id);
+                      moveCamera(preset.position, preset.target);
+                    }}
+                    className={`px-2 py-1 rounded text-[11px] font-medium transition-colors ${
+                      activePreset === preset.id
+                        ? "bg-primary text-primary-foreground font-semibold"
+                        : "text-muted-foreground hover:text-foreground hover:bg-accent"
+                    }`}
+                  >
+                    {preset.label}
+                  </button>
+                ))}
+              </div>
+            )}
+
             {/* Reset View Button */}
-            <button
-              onClick={handleResetView}
-              className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
-              title="Reset to default overview angle"
-            >
-              <RotateCcw className="h-3.5 w-3.5" />
-              <span>Reset Camera</span>
-            </button>
+            {viewMode === "3d" && (
+              <button
+                onClick={handleResetView}
+                className="inline-flex items-center gap-1.5 rounded-md border border-border px-2.5 py-1 text-xs font-medium text-muted-foreground hover:text-foreground hover:bg-accent transition-colors"
+                title="Reset to default overview angle"
+              >
+                <RotateCcw className="h-3.5 w-3.5" />
+                <span>Reset Camera</span>
+              </button>
+            )}
 
             {/* Expand / Minimize Toggle */}
             <button
@@ -321,8 +356,8 @@ export const Transformer3DViewer = React.forwardRef<Transformer3DViewerRef, Tran
           </div>
 
           <div className="flex items-center gap-2 text-[11px] text-muted-foreground font-mono">
-            <span>Click any 3D component to inspect telemetry</span>
-            {hoveredComponentId && (
+            <span>{viewMode === "3d" ? "Click any 3D component to inspect telemetry" : "Photorealistic Digital Twin SCADA Telemetry"}</span>
+            {viewMode === "3d" && hoveredComponentId && (
               <span className="text-primary font-semibold border-l border-border pl-2">
                 Hovering: {diagnostics[hoveredComponentId]?.label}
               </span>
@@ -332,18 +367,73 @@ export const Transformer3DViewer = React.forwardRef<Transformer3DViewerRef, Tran
 
         {/* Main View Area: 3D Canvas + Component Detail Drawer */}
         <div className="relative flex-1 grid lg:grid-cols-12 min-h-[460px]" style={{ height: isExpanded ? "calc(100vh - 120px)" : "500px" }}>
-          {/* 3D Canvas */}
+          {/* 3D Canvas & SCADA Twin Viewport */}
           <div className="relative lg:col-span-8 xl:col-span-8 w-full h-full bg-[#131826] overflow-hidden">
-            <div ref={containerRef} className="w-full h-full cursor-grab active:cursor-grabbing" />
+            <div ref={containerRef} className={`w-full h-full ${viewMode === "3d" ? "cursor-grab active:cursor-grabbing" : "hidden"}`} />
 
-            {/* In-canvas overlay controls */}
-            <div className="absolute bottom-3 left-3 bg-card/85 backdrop-blur border border-border rounded-md px-3 py-1.5 text-[11px] font-mono text-muted-foreground shadow-lg flex items-center gap-3">
-              <span>Left Click + Drag: Rotate</span>
-              <span className="text-border">|</span>
-              <span>Scroll: Zoom</span>
-              <span className="text-border">|</span>
-              <span>Right Click + Drag: Pan</span>
-            </div>
+            {/* SCADA Twin Image View (Image 2) */}
+            {viewMode === "scada" && (
+              <div className="absolute inset-0 bg-[#0d131f] flex flex-col items-center justify-center p-2 sm:p-4 select-none">
+                <div className="relative w-full h-full flex items-center justify-center rounded-xl overflow-hidden border border-primary/20 shadow-2xl bg-black/60">
+                  <img
+                    src="/preview.png"
+                    alt="Substation Sentinel AI Photorealistic Digital Twin"
+                    className="w-full h-full object-contain"
+                  />
+
+                  {/* Pinned Real-time SCADA HUD Telemetry Card */}
+                  <div className="absolute top-3 left-3 bg-card/90 backdrop-blur-md border border-primary/30 rounded-lg p-3 text-xs shadow-xl max-w-[240px]">
+                    <div className="text-[10px] font-mono uppercase tracking-wider text-primary font-semibold flex items-center gap-1.5">
+                      <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Live SCADA Telemetry
+                    </div>
+                    <div className="mt-2 space-y-1.5 font-mono text-[11px]">
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Winding Temp:</span>
+                        <span className="font-semibold text-foreground">{(reading?.winding_temperature ?? reading?.temperature ?? 65.2).toFixed(1)} °C</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Conservator Oil:</span>
+                        <span className="font-semibold text-foreground">{(reading?.oil_level ?? 78.4).toFixed(1)} %</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Bus Voltage:</span>
+                        <span className="font-semibold text-foreground">{(reading?.voltage ?? 400.1).toFixed(1)} kV</span>
+                      </div>
+                      <div className="flex justify-between items-center">
+                        <span className="text-muted-foreground">Load Current:</span>
+                        <span className="font-semibold text-foreground">{(reading?.current ?? 552.0).toFixed(0)} A</span>
+                      </div>
+                      <div className="flex justify-between items-center pt-1 border-t border-border/40">
+                        <span className="text-muted-foreground">ML Failure Risk:</span>
+                        <span className={`font-semibold ${prediction?.failure_probability && prediction.failure_probability > 0.4 ? "text-warning" : "text-emerald-400"}`}>
+                          {prediction?.failure_probability ? (prediction.failure_probability * 100).toFixed(1) : "3.2"} %
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Bottom SCADA Status Bar */}
+                  <div className="absolute bottom-3 right-3 bg-card/90 backdrop-blur-md border border-border/60 rounded-lg px-3 py-1.5 text-[11px] font-mono text-muted-foreground shadow-lg flex items-center gap-2">
+                    <span className="inline-block h-2 w-2 rounded-full bg-primary animate-ping" />
+                    <span className="text-foreground font-semibold">T1-400kV Bay Digital Twin</span>
+                    <span className="text-border">|</span>
+                    <span className="text-primary">Photorealistic SCADA</span>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* In-canvas overlay controls for 3D Mode */}
+            {viewMode === "3d" && (
+              <div className="absolute bottom-3 left-3 bg-card/85 backdrop-blur border border-border rounded-md px-3 py-1.5 text-[11px] font-mono text-muted-foreground shadow-lg flex items-center gap-3">
+                <span>Left Click + Drag: Rotate</span>
+                <span className="text-border">|</span>
+                <span>Scroll: Zoom</span>
+                <span className="text-border">|</span>
+                <span>Right Click + Drag: Pan</span>
+              </div>
+            )}
           </div>
 
           {/* Component Diagnostics Sidebar */}
